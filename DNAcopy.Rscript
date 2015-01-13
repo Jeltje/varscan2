@@ -1,0 +1,21 @@
+#!/usr/bin/Rscript
+
+# See http://sourceforge.net/p/varscan/discussion/1073558/thread/96c8dea8/
+# DNAcopy.Rscript myfile.copynumber
+
+library(DNAcopy)
+args <- commandArgs(TRUE)
+#batch_args <- read.table(args[1], sep=",")
+cn <- read.table(args[1],header=TRUE)
+CNA.object <-CNA(genomdat = cn[,7], chrom = cn[,1], maploc = cn[,2], data.type = 'logratio')
+CNA.smoothed <- smooth.CNA(CNA.object)
+segs <- segment(CNA.smoothed, verbose=0, alpha=0.01, nperm=10000, min.width=2, undo.splits="sdundo", undo.SD=3)
+psegs <- segments.p(segs)
+outfile <- paste(args[1],"DNAcopy.out", sep=".")
+write.table(psegs[,2:10], file=outfile, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t")
+
+#Plot whole studies
+pdf(file = "~/public_html/wholeStudy.pdf")
+plot(segs, plot.type="w")
+dev.off()
+
