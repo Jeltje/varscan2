@@ -2,7 +2,7 @@
 
 print_usage(){
 cat <<EOF
-$0 -c <control bam file> -t <tumor bam file> -i <genome index> -a <arm sizes> -s <scratch output>
+$0 -c <control bam file> -t <tumor bam file> -i <genome index> -s <scratch output>
 	Wrapper script for Varscan2
 	Runs the following steps:
 	1. samtools flagstat on each bam file
@@ -11,18 +11,16 @@ $0 -c <control bam file> -t <tumor bam file> -i <genome index> -a <arm sizes> -s
 	4. Varscan2.3.7 copynumber
 	5. Varscan2.3.7 copyCaller
 	6. DNAcopy 
-	7. MergeSegments.pl
-	8. create bed output
+	7. create bed output
+The DNAcopy step creates multiple output files per chromosome and is run
+iteratively, with decreasing SDundo parameter, until 50 or more segments
+per chromosome are found.
 
 OPTIONS:
    -h      Show this message
    -t      tumor bam file
    -c      control bam file
    -i      path to samtools genome index
-   -a      ref_arm_sizes file for mergeSegments.pl
-           Format: 
-		1       0       124300000       p
-		1       124300000       247249719       q
    -s      directory for temporary files
    -n      <varscan.N> instead of creating a new temporary directory, use this one
    -d      debug (print commands but do not run)
@@ -33,7 +31,6 @@ EOF
 cBam=
 tBam=
 idx=
-arms=
 scratch=
 prevDir=
 debug=
@@ -54,9 +51,6 @@ do
          i)
              idx=$OPTARG
              ;;
-         a)
-             arms=$OPTARG
-             ;;
          s)
              scratch=$OPTARG
              ;;
@@ -74,10 +68,10 @@ do
 done
 
 
-if [[ -z $cBam ]] || [[ -z $tBam ]] || [[ -z $idx ]] || [[ -z $arms ]]
+if [[ -z $cBam ]] || [[ -z $tBam ]] || [[ -z $idx ]] 
 then
      print_usage
-     echo "ERROR: Please give in two bam files, samtools index file, arm sizes file, and a directory to put large temporary files"
+     echo "ERROR: Please give in two bam files, samtools index file, and a directory to put large temporary files"
      exit 1
 fi
 
@@ -94,9 +88,6 @@ if [ ! -e "$tBam" ]; then
 fi 
 if [ ! -e "$idx" ]; then
 	graceful_death "cannot find samtools index $idx"
-fi 
-if [ ! -e "$arms" ]; then
-	graceful_death "cannot find mergeSegments input file $arms"
 fi 
 
 tmpdir=
@@ -118,7 +109,7 @@ else
 	fi
 	tmpdir=$prevDir
 fi
-echo "Intermediary files will be stored in $tmpdir"
+echo "Output files will be stored in $tmpdir"
 
 # checks if a file exists and has more than one line in it
 # several programs in this wrapper will output a single line if they fail
@@ -164,10 +155,7 @@ runOrDie(){
 
 samtools='nice /inside/home/jeltje/bin/samtools'
 varScan='nice java -Xmx2048m -jar /inside/home/jeltje/bin/VarScan.v2.3.7.jar'
-DNAcopy='/inside/home/jeltje/bin/DNAcopy.Rscript'
-mergeSegments='/inside/home/jeltje/bin/mergeSegments.pl'
-mergeSegToBed='/inside/home/jeltje/bin/mergeSegToBed.py'
-
+DNAcopy='/inside/home/jeltje/bin/iterDNAcopy.R'
 
 # Samtools flagstat
 infile="$cBam"
@@ -177,6 +165,7 @@ runOrDie
 
 infile=$tBam
 outfile="$tmpdir/tumor.flagstat"
+cmd="$samtools flagstat $infile > $outfile"
 runOrDie
 
 # Samtools mpileup
@@ -185,10 +174,14 @@ outfile="$tmpdir/mpileup"
 cmd="$samtools mpileup -q 1 -B -f  $infile > $outfile"
 runOrDie
 
+
+ntest=$(head -n 100000 $tmpdir/mpileup | cut -f3 | grep -c N)
+if  [ "$ntest" -eq "100000" ]; then
+	graceful_death "it looks like the chromosome names in your bam files don't match the ones in the input genome"
+fi
+
 # Varscan copynumber
 # must calculate data ratio from flagstat output
-# This should work
-# java -jar VarScan.jar copynumber [normal-tumor.mpileup] [Opt: output] OPTIONS
 # also must move to output dir to run this because varscan doesn't parse the output name
 dratio=
 if exists $tmpdir/control.flagstat && exists $tmpdir/tumor.flagstat ; then
@@ -202,56 +195,39 @@ fi
 
 pushd $tmpdir
 vOptions='--min-segment-size 100 --mpileup 1'
-dr="--data-ratio $dratio"	# must check that .88 works instead of 0.88
+dr="--data-ratio $dratio"	# .88 works instead of 0.88
 infile="mpileup"
 outfile="output.copynumber"
-cmd="$varScan copynumber $infile $outfile $vOptions $dr"
-# otherwise "cat mpileup | $varScan copynumber output $vOptions $dr"
+cmd="$varScan copynumber $infile output $vOptions $dr"	# output is base name, copynumber gets added as extension
 runOrDie
 pushd
 
+# From the output, filter any segments for which the tumor coverage is less than 10
+# and the control coverage is less than 20
+awk -v x=10 '$6 >= x' $tmpdir/output.copynumber | \
+awk -v x=20 '$5 >= x' > $tmpdir/output.copynumber.cov
+
+
 # Varscan copycaller
-infile="$tmpdir/output.copynumber"
+infile="$tmpdir/output.copynumber.cov"
 outfile="$tmpdir/copyCalled"
 ccOptions="--output-file $outfile --output-homdel-file $outfile.homdel"
 cmd="$varScan copyCaller $infile $ccOptions"
 runOrDie
 
 # Circular binary segmentation
+# First, get chromosomes
+# Then, run iterative CBS on each, lowering the SDundo by .5 until
+# we get more than 50 segments/chromosome
 infile="$tmpdir/copyCalled"
-outfile="$tmpdir/copyCalled.DNAcopy.out"
-cmd="Rscript $DNAcopy $infile"	# outputs $tmpdir/copyCalled.DNAcopy.out
-runOrDie
+chrnames=$(cut -f1 $tmpdir/copyCalled | grep -v chrom | grep -v GL00 | grep -v MT | \
+	grep -v NT | grep -v Y | sort -ur)
+for chr in $chrnames; do
+	outfile="$tmpdir/copyCalled.$chr.dnacopy.out"
+	cmd="Rscript $DNAcopy $infile $tmpdir/copyCalled.$chr $chr" >> $tmpdir/CBS.log
+	echo $cmd
+	$cmd	# do not check output because it might be empty (Y chromosome)
+#	runOrDie
+done
 
-
-# Merge neighboring amplified and deleted segments
-# first must parse DNAcopy output
-# and add chr to the start of the line
-if [ -z $DEBUG ]; then
-	grep -v "	NA" $tmpdir/copyCalled.DNAcopy.out | grep -v NT_ | \
-	grep -v MT | sed 's/^/chr/' | tail -n +2 > $tmpdir/mergeSeg.input
-fi
-
-infile="$tmpdir/mergeSeg.input"
-outfile="$tmpdir/mergeSeg.events.tsv"
-mOptions="--ref-arm-sizes $arms --output-basename"
-cmd="$mergeSegments $infile $mOptions $tmpdir/mergeSeg"
-runOrDie
-
-
-# Create bed file
-infile="$tmpdir/mergeSeg.events.tsv"
-outfile="$tmpdir/mergeSeg.bed"
-cmd="$mergeSegToBed $infile > $outfile"
-runOrDie
-
-exit
-
-
-
-# LATER
-
-# let's compare the outputs on the browser again
-#./humanCallsToDNAcopyOut.py -b minCov100.TCGA.04.1332.copyCalled.DNAcopy.out | \
-#grep -v chrMT | grep -v chrNT > DNAcopy3.bed
 
