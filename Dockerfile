@@ -23,7 +23,8 @@ RUN R CMD INSTALL DNAcopy_1.40.0.tar.gz
 # Samtools 0.1.18 - note: 0.1.19 and 1.1 do NOT work, VarScan copynumber dies on the mpileup
 RUN wget http://downloads.sourceforge.net/project/samtools/samtools/0.1.18/samtools-0.1.18.tar.bz2
 RUN tar -xvf samtools-0.1.18.tar.bz2
-RUN (cd samtools-0.1.18/ && make && make prefix='/usr/' install)
+# the make command generates a lot of warnings, none of them relevant to the final samtools code, hence 2>/dev/null
+RUN (cd samtools-0.1.18/ && make DFLAGS='-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_USE_KNETFILE -D_CURSES_LIB=0' LIBCURSES='' 2>/dev/null && mv samtools /usr/local/bin)
 
 #java
 RUN apt-get install -y default-jre
