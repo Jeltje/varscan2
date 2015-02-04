@@ -23,12 +23,13 @@ RUN R CMD INSTALL DNAcopy_1.40.0.tar.gz
 # Samtools 0.1.18 - note: 0.1.19 and 1.1 do NOT work, VarScan copynumber dies on the mpileup
 RUN wget http://downloads.sourceforge.net/project/samtools/samtools/0.1.18/samtools-0.1.18.tar.bz2
 RUN tar -xvf samtools-0.1.18.tar.bz2
-RUN (cd samtools-1.1/ && make && make prefix='/usr/' install)
+RUN (cd samtools-0.1.18/ && make && make prefix='/usr/' install)
 
 #java
 RUN apt-get install -y default-jre
 RUN wget -O /opt/VarScan.v2.3.7.jar http://sourceforge.net/projects/varscan/files/VarScan.v2.3.7.jar/download
 
+# TODO: install git and git clone https:/github.com/Jeltje/varscan2
 # Varscan scripts
 # for now let's mount run_varscan.sh from outside the image so we can tweak it
 RUN wget -O /usr/local/bin/iterDNAcopy.R http://hgwdev.cse.ucsc.edu/~jeltje/iterDNAcopy.R
