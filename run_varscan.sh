@@ -1,26 +1,29 @@
 #! /bin/bash
 
 print_usage(){
-cat <<EOF
-$0 -c <control bam file> -t <tumor bam file> -i <genome index> -s <scratch output>
+>&2 cat <<EOF
+$0 -c <control bam file> -t <tumor bam file> -i <genome index> -b <centromere bed file> -w <exome whitelist> -s <scratch output>
 	Wrapper script for Varscan2
 	Runs the following steps:
 	1. samtools flagstat on each bam file
 	2. samtools mpileup on both bam files
 	3. determine unique mapped read ratio
 	4. Varscan2.3.7 copynumber
-	5. Varscan2.3.7 copyCaller
-	6. DNAcopy 
-	7. create bed output
-The DNAcopy step creates multiple output files per chromosome and is run
-iteratively, with decreasing SDundo parameter, until 50 or more segments
-per chromosome are found.
+	5. Remove low coverage regions
+	6. Varscan2.3.7 copyCaller
+	7. calculate median for recentering
+	8. Varscan2.3.7 copyCaller recenter
+	9. Separate chromosome arms
+	10. DNAcopy
+	11. Merge chromosome arms
 
 OPTIONS:
    -h      Show this message
    -t      tumor bam file
    -c      control bam file
    -i      path to samtools genome index
+   -b      centromere locations (bed format)
+   -w      exome whitelist (bed format)
    -s      directory for temporary files
    -n      <varscan.N> instead of creating a new temporary directory, use this one
    -d      debug (print commands but do not run)
@@ -31,11 +34,13 @@ EOF
 cBam=
 tBam=
 idx=
+cent=
+white=
 scratch=
 prevDir=
 debug=
 
-while getopts "ht:c:i:s:n:a:d" OPTION
+while getopts "ht:c:i:b:w:s:n:a:d" OPTION
 do
      case $OPTION in
          h)
@@ -51,6 +56,12 @@ do
          i)
              idx=$OPTARG
              ;;
+         b)
+             cent=$OPTARG
+             ;;
+         w)
+             white=$OPTARG
+             ;;
          s)
              scratch=$OPTARG
              ;;
@@ -61,23 +72,23 @@ do
              prevDir=$OPTARG
              ;;
          ?)
-             usage
+             print_usage
              exit
              ;;
      esac
 done
 
 
-if [[ -z $cBam ]] || [[ -z $tBam ]] || [[ -z $idx ]] 
+if [[ -z $cBam ]] || [[ -z $tBam ]] || [[ -z $idx ]] || [[ -z $cent ]] || [[ -z $white ]]
 then
      print_usage
-     echo "ERROR: Please give in two bam files, samtools index file, and a directory to put large temporary files"
+     >&2 echo "ERROR: Can't find all input files"
      exit 1
 fi
 
 graceful_death() {
-	echo "ERROR: Cannot finish $0 because $1";
-	exit;
+	>&2 echo "ERROR: Cannot finish $0 because $1";
+	exit 1
 }
 
 if [ ! -e "$cBam" ]; then
@@ -88,6 +99,12 @@ if [ ! -e "$tBam" ]; then
 fi 
 if [ ! -e "$idx" ]; then
 	graceful_death "cannot find samtools index $idx"
+fi 
+if [ ! -e "$cent" ]; then
+	graceful_death "cannot find centromere bed file $cent"
+fi 
+if [ ! -e "$white" ]; then
+	graceful_death "cannot find exome whitelist $white"
 fi 
 
 tmpdir=
@@ -109,7 +126,7 @@ else
 	fi
 	tmpdir=$prevDir
 fi
-echo "Output files will be stored in $tmpdir"
+>&2 echo "Output files will be stored in $tmpdir"
 
 # checks if a file exists and has more than one line in it
 # several programs in this wrapper will output a single line if they fail
@@ -139,12 +156,12 @@ runOrDie(){
 			graceful_death "cannot run $cmd: missing or corrupted $infile"
 		fi
 	done
-	echo $cmd
+	>&2 echo $cmd
 	if [[ -z $DEBUG ]]; then
-		date
+		date >&2
 		eval $cmd
 		if ! exists "$outfile" ; then
-			graceful_death "Failed command:$cmd"
+			graceful_death "failed to find $outfile"
 		fi
 	fi
 }
@@ -155,7 +172,9 @@ runOrDie(){
 
 samtools='nice /inside/home/jeltje/bin/samtools'
 varScan='nice java -Xmx2048m -jar /inside/home/jeltje/bin/VarScan.v2.3.7.jar'
-DNAcopy='/inside/home/jeltje/bin/iterDNAcopy.R'
+DNAcopy='/inside/home/jeltje/bin/basicDNAcopy.R'
+findDelta='/inside/home/jeltje/bin/meanLogRatioByChromosome.py'
+separateArms='/inside/home/jeltje/bin/separateArms.py'
 
 # Samtools flagstat
 infile="$cBam"
@@ -171,7 +190,7 @@ runOrDie
 # Samtools mpileup
 infile="$idx $cBam $tBam"
 outfile="$tmpdir/mpileup"
-cmd="$samtools mpileup -q 1 -B -f  $infile > $outfile"
+cmd="$samtools mpileup -q 1 -B -l $white -f $infile > $outfile"
 runOrDie
 
 
@@ -193,14 +212,14 @@ if [[ -z $dratio ]] && [ -z $DEBUG ]; then
 	graceful_death "could not determine data ratio from $tmpdir/control.flagstat and $tmpdir/tumor.flagstat"
 fi 
 
-pushd $tmpdir
+pushd $tmpdir > /dev/null
 vOptions='--min-segment-size 100 --mpileup 1'
 dr="--data-ratio $dratio"	# .88 works instead of 0.88
 infile="mpileup"
 outfile="output.copynumber"
 cmd="$varScan copynumber $infile output $vOptions $dr"	# output is base name, copynumber gets added as extension
 runOrDie
-pushd
+pushd > /dev/null
 
 # From the output, filter any segments for which the tumor coverage is less than 10
 # and the control coverage is less than 20
@@ -215,19 +234,40 @@ ccOptions="--output-file $outfile --output-homdel-file $outfile.homdel"
 cmd="$varScan copyCaller $infile $ccOptions"
 runOrDie
 
-# Circular binary segmentation
-# First, get chromosomes
-# Then, run iterative CBS on each, lowering the SDundo by .5 until
-# we get more than 50 segments/chromosome
+# Calculate recenter amount
 infile="$tmpdir/copyCalled"
-chrnames=$(cut -f1 $tmpdir/copyCalled | grep -v chrom | grep -v GL00 | grep -v MT | \
-	grep -v NT | grep -v Y | sort -ur)
-for chr in $chrnames; do
-	outfile="$tmpdir/copyCalled.$chr.dnacopy.out"
-	cmd="Rscript $DNAcopy $infile $tmpdir/copyCalled.$chr $chr" >> $tmpdir/CBS.log
-	echo $cmd
-	$cmd	# do not check output because it might be empty (Y chromosome)
-#	runOrDie
-done
+delta=$($findDelta $infile)
+
+# Rerun copycaller
+infile="$tmpdir/output.copynumber.cov"
+outfile="$tmpdir/copyCalled.recenter"
+ccOptions="--output-file $outfile --output-homdel-file $outfile.homdel"
+
+cmp=$(awk -v delta=$delta 'END{if (delta < -0.2) {print "lt"} else {if (delta > 0.2) {print "gt"} else {print "eq"}}}' < /dev/null)
+if [[ "$cmp" == "lt" ]]; then
+    rd=$(echo $delta | sed 's/-//')
+    cmd="$varScan copyCaller $infile $ccOptions --recenter-down $rd"
+    runOrDie
+elif [[ "$cmp" == "gt" ]]; then
+    cmd="$varScan copyCaller $infile $ccOptions --recenter-up $delta"
+    runOrDie
+else
+    ln -s copyCalled $tmpdir/copyCalled.recenter
+fi
+
+# add p and q to chromosome arms
+infile="$tmpdir/copyCalled.recenter"
+outfile="$tmpdir/copyCalled.recenter.sep"
+cmd="$separateArms $infile $cent > $outfile"
+runOrDie
+
+# Circular binary segmentation
+infile="$tmpdir/copyCalled.recenter.sep"
+outfile="$tmpdir/copyCalled.recenter.sep.SD.2.5.dnacopy.out"
+cmd="Rscript $DNAcopy $infile 2.5 >/dev/null"
+runOrDie
+
+# remove the arms and print to stdout
+sed 's/\.[pq]	/	/' $tmpdir/copyCalled.recenter.sep.SD.2.5.dnacopy.out
 
 
