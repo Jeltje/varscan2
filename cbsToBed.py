@@ -3,11 +3,12 @@
 import sys, os, re, getopt
 usage = sys.argv[0]+""" <file>
 
-Create bed file based on mergeSegments output with
-amplified and deleted codes converted to colors
+Create bed file based on CBS output with
+with segment scores converted to colors (red for amplified, blue for deleted)
 
 Option: 
 	-n Don't create bed header
+	-c <float> cutoff for amplification or deletion (default 0.25)
 
 """
 
@@ -15,7 +16,7 @@ Option:
 # Main
 # read in command line and options
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "fdchbn")
+    opts, args = getopt.getopt(sys.argv[1:], "fdc:hbn")
 except getopt.GetoptError:
     
         # print help information and exit:
@@ -25,17 +26,18 @@ except getopt.GetoptError:
 
 makeBed = True
 head = True
+val = 0.25
 for o, a  in opts:
 #    if o == "-d":
 #        doNotDelete = True
     if o == "-n":
         head = False
+    if o == "-c":
+        val = float(a)
     if o == "-h":
         print usage
         sys.exit()
 
-#some = 0.249
-#very = 1
 
 if len(args) != 1:
     sys.exit(usage)
@@ -50,25 +52,20 @@ if makeBed and head:
 for line in f:
     line = line.strip()
     fields = line.split("\t")
-    if fields[0] == 'chrom':
+    if fields[0] == 'ID':
 	continue
     counter+=1
     id=('.').join(['mrg', str(counter)])
     qualifier = "neutral"
     rgb='0,0,0'
-    if(fields[7] == 'deletion'):
+    if(float(fields[5]) < -val):
         rgb='0,0,255'	# blue
-    elif(fields[7] == 'amplification'):
+    elif(float(fields[5]) > val):
         rgb='255,0,0'	# red
-    elif(fields[7] == 'neutral'):
+    else:
         rgb='0,0,0'	# black
-    else:
-	print >>sys.stderr, "don't understand", fields[7]
-
-    if makeBed:
-        outstring = ("\t").join([fields[0], fields[1], fields[2], id, '0', '.', fields[1], fields[1], rgb ])
-    else:
-        outstring = ("\t").join([fields[0], fields[1], fields[2], fields[4], qualifier])
+    chr = ("").join(["chr", fields[1]])
+    outstring = ("\t").join([chr, fields[2], fields[3], id, '0', '.', fields[2], fields[2], rgb ])
     print outstring
 f.close()
 
