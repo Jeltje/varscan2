@@ -3,8 +3,8 @@
 import sys, os, re, getopt
 usage = sys.argv[0]+""" <file>
 
-Create bed file based on CBS output with
-with segment scores converted to colors (red for amplified, blue for deleted)
+Create bed file based on Varscan CBS output with
+segment scores converted to colors (red for amplified, blue for deleted)
 
 Option: 
 	-n Don't create bed header

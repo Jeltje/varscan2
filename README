@@ -1,0 +1,73 @@
+This repository contains files for running Varscan's copynumber variation program.
+For details on Varscan, see http://dkoboldt.github.io/varscan/
+
+Files in this repository
+	*Dockerfile
+	*cbsToBed.py
+	*run_varscan
+	     *basicDNAcopy.R
+	     *meanLogRatioByChromosome.py
+	     *separateArms.py
+
+The Dockerfile can be used to create a docker image (https://www.docker.com/) that loads Varscan itself, the run_varscan tool and its helper scripts, as well as the correct version of Samtools (0.1.18).
+
+The cbsToBed.py script can be used to create bed format output from Varscan's CBS output. It is not necessary to run the program.
+
+run_varscan is a wrapper script for Varscan's copynumber variation program (varscan copyCaller).
+Inputs are
+	* Tumor exome bam file
+	* Control exome bam file of the same patient, e.g. from a blood sample
+	* Samtools indexed genome
+	* Centromere bed file
+	* Whitelist bed file
+Details:
+Tumor and control really must be from the same patient and processed in the same experiment. Batch effects are strong in exome experiments and using the wrong control renders Varscan output meaningless.
+
+To index a genome, run
+	samtools faidx <genome.fa>
+This creates an index named genome.fa.fai
+The genome and the index must be in the same directory, and the genome file (not the index) is the input to run_varscan
+
+A bed file with centromeres can be downloaded using UCSC's table browser for the genome of interest.
+See https://genome.ucsc.edu/FAQ/FAQtracks.html#tracks20 (Locating centromeres and telomeres) for details
+
+The whitelist is a bed format file with the exome targets used in the experiment. It ensures that Varscan only uses target regions for its analysis and not any off target read matches. It is important to use the real list of exome targets. For meaningful results do not use a generic list.
+
+Prerequisites
+
+	*Varscan needs samtools 0.1.18 or earlier to run. Later versions result in a segfault. This is a known problem that may be resolved in later versions of Varscan.
+	http://downloads.sourceforge.net/project/samtools/samtools/0.1.18/samtools-0.1.18.tar.bz2
+	*The R statistics package and DNAcopy package:
+	http://www.bioconductor.org/packages/release/bioc/src/contrib/DNAcopy_1.40.0.tar.gz
+	*Java
+	(apt-get install -y default-jre)
+
+
+Usage statement
+
+./run_varscan -c <control bam file> -t <tumor bam file> -i <genome index> -b <centromere bed file> -w <exome whitelist> -s <scratch output>
+	Wrapper script for Varscan2
+	Runs the following steps:
+	1. samtools flagstat on each bam file
+	2. samtools mpileup on both bam files
+	3. determine unique mapped read ratio
+	4. Varscan2.3.7 copynumber
+	5. Remove low coverage regions
+	6. Varscan2.3.7 copyCaller
+	7. calculate median for recentering
+	8. Varscan2.3.7 copyCaller recenter
+	9. Separate chromosome arms
+	10. DNAcopy
+	11. Merge chromosome arms
+
+OPTIONS:
+   -h      Show this message
+   -t      tumor bam file
+   -c      control bam file
+   -i      path to samtools genome index
+   -b      centromere locations (bed format)
+   -w      exome whitelist (bed format)
+   -s      directory for temporary files
+   -n      <varscan.N> instead of creating a new temporary directory, use this one
+   -d      debug (print commands but do not run)
+
