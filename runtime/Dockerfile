@@ -9,26 +9,29 @@ RUN apt-get update && apt-get install -y \
 
 
 # R and DNAcopy package (move to R library location)
-ADD DNAcopy_1.40.0.tar.gz
-RUN R CMD INSTALL DNAcopy_1.40.0.tar.gz 
+# Note: cannot use ADD because this untars the file
+COPY exec/DNAcopy_1.42.0.tar.gz /tmp/
+RUN R CMD INSTALL /tmp/DNAcopy_1.42.0.tar.gz 
 
 # Samtools 0.1.18 - note: 0.1.19 and 1.1 do NOT work, VarScan copynumber dies on the mpileup
-RUN wget http://downloads.sourceforge.net/project/samtools/samtools/0.1.18/samtools-0.1.18.tar.bz2
-ADD samtools /usr/local/bin
+ADD exec/samtools /usr/local/bin/
 
 # Copy over jar and place in /opt/cgl-docker-lib
 RUN mkdir /opt/cgl-docker-lib
-ADD VarScan.jar  /opt/cgl-docker-lib/
+ADD exec/VarScan.jar  /opt/cgl-docker-lib/
 
 # Move wrapper and helper scripts to same location
-ADD run_varscan /opt/cgl-docker-lib
-ADD separateArms.py /opt/cgl-docker-lib
-ADD basicDNAcopy.R /opt/cgl-docker-lib
-ADD meanLogRatioByChromosome.py /opt/cgl-docker-lib
+ADD ./run_varscan /opt/cgl-docker-lib/
+ADD ./separateArms.py /opt/cgl-docker-lib/
+ADD ./basicDNAcopy.R /opt/cgl-docker-lib/
+ADD ./meanLogRatioByChromosome.py /opt/cgl-docker-lib/
 
 # Set WORKDIR to /data -- predefined mount location.
 RUN mkdir /data
 WORKDIR /data
+
+# And clean up
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/DNAcopy_1.42.0.tar.gz
 
 ENTRYPOINT ["bash", "/opt/cgl-docker-lib/run_varscan"]
 

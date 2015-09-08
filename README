@@ -1,18 +1,23 @@
 This repository contains files for running Varscan's copynumber variation program.
 For details on Varscan, see http://dkoboldt.github.io/varscan/
 
-Files in this repository
-	*Dockerfile
-	*cbsToBed.py
-	*run_varscan
-	     *basicDNAcopy.R
-	     *meanLogRatioByChromosome.py
-	     *separateArms.py
+Structure of this repository
+	runtime
+		/Dockerfile
+		/separateArms.py
+		/meanLogRatioByChromosome.py
+		/run_varscan
+		/basicDNAcopy.R
+		/cbsToBed.py
+	build
+		/Dockerfile
+	Makefile
 
-The Dockerfile can be used to create a docker image (https://www.docker.com/) that loads Varscan itself, the run_varscan tool and its helper scripts, as well as the correct version of Samtools (0.1.18).
+The make command can be used to compile a docker image (https://www.docker.com/) that contains Varscan itself, the run_varscan tool and its helper scripts, as well as the correct version of Samtools (0.1.18).
 
 The cbsToBed.py script can be used to create bed format output from Varscan's CBS output. It is not necessary to run the program.
 
+It is also possible to run the wrapper script (run_varscan) directly from the runtime directory.
 run_varscan is a wrapper script for Varscan's copynumber variation program (varscan copyCaller).
 Inputs are
 	* Tumor exome bam file
@@ -42,32 +47,4 @@ Prerequisites
 	*Java
 	(apt-get install -y default-jre)
 
-
-Usage statement
-
-./run_varscan -c <control bam file> -t <tumor bam file> -i <genome index> -b <centromere bed file> -w <exome whitelist> -s <scratch output>
-	Wrapper script for Varscan2
-	Runs the following steps:
-	1. samtools flagstat on each bam file
-	2. samtools mpileup on both bam files
-	3. determine unique mapped read ratio
-	4. Varscan2.3.7 copynumber
-	5. Remove low coverage regions
-	6. Varscan2.3.7 copyCaller
-	7. calculate median for recentering
-	8. Varscan2.3.7 copyCaller recenter
-	9. Separate chromosome arms
-	10. DNAcopy
-	11. Merge chromosome arms
-
-OPTIONS:
-   -h      Show this message
-   -t      tumor bam file
-   -c      control bam file
-   -i      path to samtools genome index
-   -b      centromere locations (bed format)
-   -w      exome whitelist (bed format)
-   -s      directory for temporary files
-   -n      <varscan.N> instead of creating a new temporary directory, use this one
-   -d      debug (print commands but do not run)
 

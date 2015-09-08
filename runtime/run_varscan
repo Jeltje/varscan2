@@ -8,11 +8,11 @@ $0 -c <control bam file> -t <tumor bam file> -i <genome index> -b <centromere be
 	1. samtools flagstat on each bam file
 	2. samtools mpileup on both bam files
 	3. determine unique mapped read ratio
-	4. Varscan2.3.7 copynumber
+	4. VarScan copynumber
 	5. Remove low coverage regions
-	6. Varscan2.3.7 copyCaller
+	6. VarScan copyCaller
 	7. calculate median for recentering
-	8. Varscan2.3.7 copyCaller recenter
+	8. VarScan copyCaller recenter
 	9. Separate chromosome arms
 	10. DNAcopy
 	11. Merge chromosome arms
