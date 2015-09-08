@@ -26,7 +26,8 @@ OPTIONS:
    -w      exome whitelist (bed format)
    -s      directory for temporary files
    -n      <varscan.N> instead of creating a new temporary directory, use this one
-   -d      debug (print commands but do not run)
+
+IMPORTANT NOTE: this script expects a copy of VarScan.jar in the same directory as this program. For details on downloading Varscan, see the README
 
 EOF
 }
@@ -38,7 +39,6 @@ cent=
 white=
 scratch=
 prevDir=
-debug=
 
 while getopts "ht:c:i:b:w:s:n:a:d" OPTION
 do
@@ -168,29 +168,38 @@ runOrDie(){
 
 
 
-########## MAIN ################
 
-samtools='nice /inside/home/jeltje/bin/samtools'
-varScan='nice java -Xmx2048m -jar /inside/home/jeltje/bin/VarScan.v2.3.7.jar'
-DNAcopy='/inside/home/jeltje/bin/basicDNAcopy.R'
-findDelta='/inside/home/jeltje/bin/meanLogRatioByChromosome.py'
-separateArms='/inside/home/jeltje/bin/separateArms.py'
+# correct version of samtools?
+cmd="samtools 2>&1 | grep Version | cut -f2 -d' '"
+sVersion=$(eval $cmd)
+if [ $sVersion != "0.1.18" ]; then
+	graceful_death "wrong samtools version: expected 0.1.18, got $sVersion"
+fi
+
+# find location of run script so we can get the other necessary scripts
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+DNAcopy=$DIR/basicDNAcopy.R
+findDelta=$DIR/meanLogRatioByChromosome.py
+separateArms=$DIR/separateArms.py
+varScan="nice java -Xmx2048m -jar $DIR/VarScan.jar"
+
+########## MAIN ################
 
 # Samtools flagstat
 infile="$cBam"
 outfile="$tmpdir/control.flagstat"
-cmd="$samtools flagstat $infile > $outfile"
+cmd="samtools flagstat $infile > $outfile"
 runOrDie 
 
 infile=$tBam
 outfile="$tmpdir/tumor.flagstat"
-cmd="$samtools flagstat $infile > $outfile"
+cmd="samtools flagstat $infile > $outfile"
 runOrDie
 
 # Samtools mpileup
 infile="$idx $cBam $tBam"
 outfile="$tmpdir/mpileup"
-cmd="$samtools mpileup -q 1 -B -l $white -f $infile > $outfile"
+cmd="samtools mpileup -q 1 -B -l $white -f $infile > $outfile"
 runOrDie
 
 
