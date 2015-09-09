@@ -2,7 +2,7 @@
 
 print_usage(){
 >&2 cat <<EOF
-$0 -c <control bam file> -t <tumor bam file> -i <genome index> -b <centromere bed file> -w <exome whitelist> -s <scratch output>
+$0 -c <control bam file> -t <tumor bam file> -q <sample ID> -i <genome fasta> -b <centromere bed file> -w <exome whitelist> -s <tmp output>
 	Wrapper script for Varscan2
 	Runs the following steps:
 	1. samtools flagstat on each bam file
@@ -21,10 +21,12 @@ OPTIONS:
    -h      Show this message
    -t      tumor bam file
    -c      control bam file
-   -i      path to samtools genome index
+   -q      optional sample ID, eg TCGA-001-4-2018
+   -i      path to indexed genome (index using samtools faidx)
    -b      centromere locations (bed format)
    -w      exome whitelist (bed format)
-   -s      directory for temporary files
+   -s      directory for temporary files. The script creates a directory varscan.N inside.
+   -d      do not delete temporary output
    -n      <varscan.N> instead of creating a new temporary directory, use this one
 
 IMPORTANT NOTE: this script expects a copy of VarScan.jar in the same directory as this program. For details on downloading Varscan, see the README
@@ -34,13 +36,15 @@ EOF
 
 cBam=
 tBam=
+sampleid="sample"
 idx=
 cent=
 white=
 scratch=
 prevDir=
+cleanup=true
 
-while getopts "ht:c:i:b:w:s:n:a:" OPTION
+while getopts "ht:c:q:i:b:w:s:n:a:d" OPTION
 do
      case $OPTION in
          h)
@@ -52,6 +56,9 @@ do
              ;;
          c)
              cBam=$OPTARG
+             ;;
+         q)
+             sampleid=$OPTARG
              ;;
          i)
              idx=$OPTARG
@@ -65,6 +72,9 @@ do
          s)
              scratch=$OPTARG
              ;;
+         d)
+             cleanup=false
+             ;;
          n)
              prevDir=$OPTARG
              ;;
@@ -74,7 +84,6 @@ do
              ;;
      esac
 done
-
 
 if [[ -z $cBam ]] || [[ -z $tBam ]] || [[ -z $idx ]] || [[ -z $cent ]] || [[ -z $white ]]
 then
@@ -274,6 +283,11 @@ cmd="Rscript $DNAcopy $infile 2.5 >/dev/null"
 runOrDie
 
 # remove the arms and print to stdout
-sed 's/\.[pq]	/	/' $tmpdir/copyCalled.recenter.sep.SD.2.5.dnacopy.out
+sed 's/\.[pq]	/	/' $tmpdir/copyCalled.recenter.sep.SD.2.5.dnacopy.out | \
+	sed "s/^sample/$sampleid/"
 
-
+# clean up
+if $cleanup; then
+    rm $tmpdir/*
+    rmdir $tmpdir
+fi

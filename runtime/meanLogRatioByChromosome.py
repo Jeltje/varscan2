@@ -1,4 +1,4 @@
-#!/inside/home/cline/bin/python
+#!/usr/bin/python
 
 import sys, os, re, argparse
 from numpy import *

@@ -1,8 +1,11 @@
 FROM ubuntu:14.04
 
+# Note: FROM java and FROM r-base work too but take much longer apt-get updating
+
 MAINTAINER Jeltje van Baren, jeltje.van.baren@gmail.com
 
 RUN apt-get update && apt-get install -y \
+	python-numpy \
         default-jre \
 	r-base \
         bc
