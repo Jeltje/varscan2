@@ -40,12 +40,12 @@ white=
 scratch=
 prevDir=
 
-while getopts "ht:c:i:b:w:s:n:a:d" OPTION
+while getopts "ht:c:i:b:w:s:n:a:" OPTION
 do
      case $OPTION in
          h)
-             usage
-             exit 1
+             print_usage
+             exit
              ;;
          t)
              tBam=$OPTARG
@@ -64,9 +64,6 @@ do
              ;;
          s)
              scratch=$OPTARG
-             ;;
-         d)
-             DEBUG=1
              ;;
          n)
              prevDir=$OPTARG

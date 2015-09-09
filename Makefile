@@ -13,7 +13,7 @@ nametag = jeltje/varscan:0.0.1
 all: ${build_output} ${build_tool}
 
 ${build_output}: ${build_path}/Dockerfile
-	cd ${build_path} # && docker build -t varscanbuild .
+	cd ${build_path} && docker build -t varscanbuild .
 	docker run -v ${runtime_fullpath}:/data varscanbuild cp -r exec /data; done
 
 ${build_tool}: ${build_output} ${runtime_path}/Dockerfile
