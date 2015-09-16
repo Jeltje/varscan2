@@ -34,6 +34,9 @@ WORKDIR /home/varscan-src/samtools-0.1.18
 RUN make DFLAGS='-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_USE_KNETFILE -D_CURSES_LIB=0' LIBCURSES='' 2>/dev/null 
 RUN mv samtools /home/exec
 
+# change ownership of outputfiles so they can be deleted
+RUN chmod -R 777 /home/exec
+
 # Set working directory
 WORKDIR /home
  

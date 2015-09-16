@@ -29,8 +29,6 @@ OPTIONS:
    -d      do not delete temporary output
    -n      <varscan.N> instead of creating a new temporary directory, use this one
 
-IMPORTANT NOTE: this script expects a copy of VarScan.jar in the same directory as this program. For details on downloading Varscan, see the README
-
 EOF
 }
 
@@ -118,6 +116,14 @@ if [[ -z "$prevDir" ]] && [[ -z $scratch ]]; then
 	graceful_death "Please give either the -n OR -s option"
 fi
 
+uid=0
+# if this is a docker container, change ownership of output
+if [ -e "/proc/1/cgroup" ]; then 
+    if grep -q docker /proc/1/cgroup; then
+        uid=$(stat -c '%u:%g' /data)    	# note, this only works if something is mounted under /data
+    fi 
+fi
+
 # select correct temp dir
 if  [[ -z "$prevDir" ]]; then
 	if [ ! -d "$scratch" ]; then
@@ -126,6 +132,10 @@ if  [[ -z "$prevDir" ]]; then
 	tmpExt=$RANDOM
 	tmpdir="$scratch/varscan.$tmpExt"
 	mkdir $tmpdir
+	# if we're in a docker container, fix ownership
+        if [ $uid != "0" ]; then
+           chown $uid $tmpdir
+        fi
 else
 	if [ ! -d "$prevDir" ]; then
 		graceful_death "cannot find previous run directory $prevDir"
@@ -153,7 +163,11 @@ exists(){
 # runOrDie gets its variables directly from MAIN
 runOrDie(){
 	if exists "$outfile" ; then
-		return 0	# nothing to be done
+            # if we're in a docker container, fix ownership
+            if [ $uid != "0" ]; then
+                chown $uid $outfile
+            fi
+	    return 0	# nothing to be done
 	fi
 	for file in $infile; do
 		ext=$(echo $file | sed "s/.*\.//");
@@ -268,6 +282,9 @@ elif [[ "$cmp" == "gt" ]]; then
     runOrDie
 else
     ln -s copyCalled $tmpdir/copyCalled.recenter
+    if [ $uid != "0" ]; then
+       chown $uid $tmpdir/copyCalled.recenter
+    fi
 fi
 
 # add p and q to chromosome arms
@@ -291,3 +308,4 @@ if $cleanup; then
     rm $tmpdir/*
     rmdir $tmpdir
 fi
+
