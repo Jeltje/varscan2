@@ -24,7 +24,7 @@ RUN mv varscan/VarScan.v2.*.jar /home/exec/VarScan.jar
 
 # R and DNAcopy package (move to R library location)
 # NOTE: this is NOT a stable way of doing this, bioconductor updates this package regularly
-RUN wget -O /home/exec/DNAcopy_1.42.0.tar.gz http://www.bioconductor.org/packages/release/bioc/src/contrib/DNAcopy_1.42.0.tar.gz
+RUN wget -O /home/exec/DNAcopy_1.42.0.tar.gz http://www.bioconductor.org/packages/release/bioc/src/contrib/DNAcopy_1.44.0.tar.gz
 
 # Samtools 0.1.18 - note: 0.1.19 and 1.1 do NOT work, VarScan copynumber dies on the mpileup
 RUN wget http://downloads.sourceforge.net/project/samtools/samtools/0.1.18/samtools-0.1.18.tar.bz2
