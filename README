@@ -1,5 +1,12 @@
-This repository contains files for running Varscan's copynumber variation program.
-For details on Varscan, see http://dkoboldt.github.io/varscan/
+# Varscan2
+
+Varscan2 was developed by Dan Koboldt (see References below). It can be used to detect copy number variation (CNV) in sample pairs, usually exomes from a tumor and control from one patient.
+
+The Varscan2 executable (https://github.com/dkoboldt/varscan.git) combines several tools. It is meant to be run in a pipeline, during which different tools are called in sequence. For details on Varscan, see http://dkoboldt.github.io/varscan/
+
+**This repository contains code to create a docker implementation of a Varscan2 copynumber variation pipeline.** It contains a wrapper script that uses Varscan tools and other programs *with specific parameters*. These may not be the perfect parameters for your particular samples. See below for the full list of pipeline steps.
+
+A docker image can be downloaded directly from dockerhub using `docker pull jeltje/varscan2`
 
 Structure of this repository
 	runtime
@@ -8,13 +15,95 @@ Structure of this repository
 		/meanLogRatioByChromosome.py
 		/run_varscan
 		/basicDNAcopy.R
-		/cbsToBed.py
 	build
 		/Dockerfile
+	src
+		/cbsToBed.py
 	Makefile
 
-The make command can be used to compile a docker image (https://www.docker.com/) that contains Varscan itself, the run_varscan tool and its helper scripts, as well as the correct version of Samtools (0.1.18).
+## Installation
 
+After getting the code via `git clone https://github.com/Jeltje/varscan2.git`, 
+change to the varscan2 directory and run
+
+``make``
+
+This will do the following:
+  1. Build a docker image named varscanbuild, on which it will download and install all needed tools in one directory. This includes the latest copy of Varscan2, the correct version of samtools (0.1.18), and the R DNAcopy package.
+  This step takes a while.
+  2. Start the varscanbuild container from the comand line, then copy the build directory from the container to the 
+  /runtime directory.
+  3. Build the jeltje/varscan container using the built tools.
+  This step should take a few minutes.
+
+This two step Docker build process makes it easier to edit the jeltje/varscan 'runtime' container because the necessary
+programs have all been compiled.
+
+
+## Running the docker container
+
+For details on running docker containers in general, see the excellent tutorial at https://docs.docker.com/linux/
+
+To see a usage statement, run
+
+``
+docker run jeltje/varscan
+``
+
+### Example input:
+
+``
+docker run  -v /path/to/input/files:/data jeltje/varscan -c normal.bam -t  tumor.bam -q sampleid -i genome.fa -b centromeres.bed -w targets.bed -s tmpdir > varscan.csv
+
+``
+
+where
+
+`normal.bam` and `tumor.bam`    are BAM format files of exome reads aligned to the genome. 
+
+`sampleid` is an identifier for the patient. This will be used in the output.
+
+`genome.fa` is a fasta file containing the genome that was used to create the BAM files
+
+`centromeres.bed` is a bed format file containing centromere locations. This list is used to remove centromeres from the CBS calls.
+
+`targets.bed` is a list of exome targets in bed format. This is used as a 'whitelist' of genome regions so that off target alignments will not be used for analysis
+
+`tmpdir` is a directory for temporary output files. If you set option -d, these files will be kept
+
+
+Centromeres for hg19 are provided ind the `/data` directory
+
+>       You can find centromere locations for genomes via
+>       http://genome.ucsc.edu/cgi-bin/hgTables
+>       Using the following selections:
+>       - group: Mapping and Sequencing
+>       - track:gap
+>       -       filter - goes to new page, look for 'type does match' and type centromere, submit
+>       -       output format: bed
+>       Submit, on the next page just press Get Bed
+
+## The pipeline
+
+The docker container runs the following:
+
+        1. samtools flagstat on each bam file
+        2. samtools mpileup on both bam files
+        3. determine unique mapped read ratio
+        4. VarScan copynumber
+        5. Remove low coverage regions
+        6. VarScan copyCaller
+        7. calculate median for recentering
+        8. VarScan copyCaller recenter
+        9. Separate chromosome arms
+        10. DNAcopy (CBS)
+        11. Merge chromosome arms
+
+The chromosome arms are separated before the Circular Binary Segmentation (CBS) step to avoid making calls across centromeres.
+
+## Output
+
+TODO: REWRITE BELOW
 The cbsToBed.py script can be used to create bed format output from Varscan's CBS output. It is not necessary to run the program.
 
 It is also possible to run the wrapper script (run_varscan) directly from the runtime directory.
@@ -48,3 +137,8 @@ Prerequisites
 	(apt-get install -y default-jre)
 
 
+## References
+
+Koboldt DC, Zhang Q, Larson DE, Shen D, McLellan MD, Lin L, Miller CA, Mardis ER, Ding L, Wilson RK. 
+VarScan 2: somatic mutation and copy number alteration discovery in cancer by exome sequencing. 
+Genome Res. 2012 Mar;22(3):568-76. doi: 10.1101/gr.129684.111. 
