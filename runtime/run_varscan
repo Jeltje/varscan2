@@ -266,6 +266,9 @@ runOrDie
 # Calculate recenter amount
 infile="$tmpdir/copyCalled"
 delta=$($findDelta $infile)
+if [ -z "$delta" ]; then
+    graceful_death "Could not find chr average, please make sure your bamfiles cover all chromosomes (samtools idxstats file.bam)"
+fi
 
 # Rerun copycaller
 infile="$tmpdir/output.copynumber.cov"
