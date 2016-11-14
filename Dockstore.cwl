@@ -9,11 +9,11 @@ description: |
     ```
     Usage:
     # fetch CWL
-    $> dockstore cwl --entry quay.io/jeltje/varscan2:v1.0.1 > Dockstore.cwl
+    $> dockstore cwl --entry quay.io/jeltje/varscan2:v1.0.2 > Dockstore.cwl
     # make a runtime JSON template and edit it (or use the content of sample_configs.json in this git repo)
     $> dockstore convert cwl2json --cwl Dockstore.cwl > Dockstore.json
     # run it locally with the Dockstore CLI
-    $> dockstore launch --entry quay.io/jeltje/varscan2:v1.0.1 \
+    $> dockstore launch --entry quay.io/jeltje/varscan2:v1.0.2 \
         --json Dockstore.json
     ```
 
@@ -24,7 +24,7 @@ dct:creator:
 
 requirements:
   - class: DockerRequirement
-    dockerPull: "quay.io/jeltje/varscan2:v1.0.1"
+    dockerPull: "quay.io/jeltje/varscan2:v1.0.2"
 
 hints:
   - class: ResourceRequirement
