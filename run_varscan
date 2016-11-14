@@ -32,12 +32,12 @@ OPTIONS:
 EOF
 }
 
-cBam=
-tBam=
+cBam='False'
+tBam='False'
 sampleid="sample"
-idx=
-cent=
-white=
+idx='False'
+cent='False'
+white='False'
 scratch=
 prevDir=
 cleanup=true
@@ -83,45 +83,31 @@ do
      esac
 done
 
-if [[ -z $cBam ]] || [[ -z $tBam ]] || [[ -z $idx ]] || [[ -z $cent ]] || [[ -z $white ]]
-then
-     print_usage
-     >&2 echo "ERROR: Can't find all input files"
-     exit 1
-fi
-
 graceful_death() {
 	>&2 echo "ERROR: Cannot finish $0 because $1";
 	exit 1
 }
 
-if [ ! -e "$cBam" ]; then
-	graceful_death "cannot find control bam file $cBam"
-fi 
-if [ ! -e "$tBam" ]; then
-	graceful_death "cannot find tumor bam file $tBam"
-fi 
-if [ ! -e "$idx" ]; then
-	graceful_death "cannot find samtools index $idx"
-fi 
-if [ ! -e "$cent" ]; then
-	graceful_death "cannot find centromere bed file $cent"
-fi 
-if [ ! -e "$white" ]; then
-	graceful_death "cannot find exome whitelist $white"
-fi 
+# Check if all file arguments have been given and are valid
+file_check() {
+    if [ $1 == 'False' ]; then
+        print_usage
+        graceful_death "missing some input arguments"
+    fi
+    if [[ ! -e "$1" ]]; then
+        print_usage
+        graceful_death "can't find $1"
+    fi
+}
 
+for i in $cBam $tBam $idx $cent $white; do
+        file_check $i
+done
+
+# Sanity check
 tmpdir=
 if [[ -z "$prevDir" ]] && [[ -z $scratch ]]; then
 	graceful_death "Please give either the -n OR -s option"
-fi
-
-uid=0
-# if this is a docker container, change ownership of output
-if [ -e "/proc/1/cgroup" ]; then 
-    if grep -q docker /proc/1/cgroup; then
-        uid=$(stat -c '%u:%g' /data)    	# note, this only works if something is mounted under /data
-    fi 
 fi
 
 # select correct temp dir
@@ -132,10 +118,6 @@ if  [[ -z "$prevDir" ]]; then
 	tmpExt=$RANDOM
 	tmpdir="$scratch/varscan.$tmpExt"
 	mkdir $tmpdir
-	# if we're in a docker container, fix ownership
-        if [ $uid != "0" ]; then
-           chown $uid $tmpdir
-        fi
 else
 	if [ ! -d "$prevDir" ]; then
 		graceful_death "cannot find previous run directory $prevDir"
@@ -163,10 +145,6 @@ exists(){
 # runOrDie gets its variables directly from MAIN
 runOrDie(){
 	if exists "$outfile" ; then
-            # if we're in a docker container, fix ownership
-            if [ $uid != "0" ]; then
-                chown $uid $outfile
-            fi
 	    return 0	# nothing to be done
 	fi
 	for file in $infile; do
@@ -285,9 +263,6 @@ elif [[ "$cmp" == "gt" ]]; then
     runOrDie
 else
     ln -s copyCalled $tmpdir/copyCalled.recenter
-    if [ $uid != "0" ]; then
-       chown $uid $tmpdir/copyCalled.recenter
-    fi
 fi
 
 # add p and q to chromosome arms

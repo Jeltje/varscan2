@@ -3,7 +3,7 @@
 class: CommandLineTool
 id: "Varscan2"
 label: "Varscan2 workflow"
-cwlVersion: cwl:draft-3
+cwlVersion: v1.0
 description: |
     A Docker container for a Varscan2 workflow. See the [github repo](https://github.com/Jeltje/varscan2) for more information.
     ```
@@ -29,13 +29,13 @@ requirements:
 hints:
   - class: ResourceRequirement
     coresMin: 1
-
-stdout: output.cnv
-
+    ramMin: 4092
+    outdirMin: 512000
+    doc: "the process requires at least 4G of RAM"
 inputs:
   - id: "#genome"
     type: File
-    description: "Genome fasta"
+    doc: "Genome fasta"
     format: "http://edamontology.org/format_1929"
     inputBinding:
       prefix: -i
@@ -44,48 +44,44 @@ inputs:
 
   - id: "#centromeres"
     type: File
-    description: "Centromere bed file"
+    doc: "Centromere bed file"
     format: "http://edamontology.org/format_3003"
     inputBinding:
       prefix: -b
 
   - id: "#targets"
     type: File
-    description: "Exome Targets bed file"
+    doc: "Exome Targets bed file"
     format: "http://edamontology.org/format_3003"
     inputBinding:
       prefix: -w
 
   - id: "#control_bam_input"
     type: File
-    description: "The control exome BAM file used as input, it must be sorted."
+    doc: "The control exome BAM file used as input, it must be sorted."
     format: "http://edamontology.org/format_2572"
     inputBinding:
       prefix: -c 
 
   - id: "#tumor_bam_input"
     type: File
-    description: "The tumor exome BAM file used as input, it must be sorted."
+    doc: "The tumor exome BAM file used as input, it must be sorted."
     format: "http://edamontology.org/format_2572"
     inputBinding:
       prefix: -t 
 
   - id: "#sample_id"
     type: string
-    description: "sample ID to use in output"
+    doc: "sample ID to use in output"
     inputBinding:
       prefix: -q 
 
-  - id: "#workdir"
-    type: string
-    description: "Temporary workdir, must be set to /data"
-    inputBinding:
-      prefix: -s 
+
+stdout: output.cnv
 
 outputs: 
   - id: output
-    type: File
-    outputBinding:
-      glob: output.cnv
+    type: stdout
 
-baseCommand: []
+baseCommand: ["-s", "/var/spool/cwl"]
+
