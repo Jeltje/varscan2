@@ -7,9 +7,9 @@ Varscan2 was developed by Dan Koboldt (see References below). It can be used to 
 The Varscan2 executable (https://github.com/dkoboldt/varscan.git) combines several tools. It is meant to be run in a pipeline, during which different tools are called in sequence. For details on Varscan, see http://dkoboldt.github.io/varscan/
 
 
-**This repository contains code to create a docker implementation of a Varscan2 complete copynumber variation pipeline.** It contains a wrapper script that uses Varscan tools and other programs *with specific parameters*. These may not be the perfect parameters for your particular samples. See below for the full list of pipeline steps.
+This repository ONLY contains a pipeline for Varscan2 **copynumber variation**. If you want to run other Varscan tools, please use Varscan2 directly. This docker container contains a wrapper script that uses Varscan tools and other programs *with specific parameters*. These may not be the perfect parameters for your particular samples. See below for the full list of pipeline steps.
 
-**Inputs** to the program are a tumor/control pair of BAM files and several bed format helper files (see below).
+**Inputs** to the program are a tumor/control pair of BAM files and several [bed format](https://genome.ucsc.edu/FAQ/FAQformat#format1) helper files (see below).
 **Output** is a file with chromosome segments that are scored for amplification or deletion.
 
 To get per-gene output, these scores must be mapped to an annotation, for example using [this program] (https://github.com/Jeltje/cnvtogenes)
@@ -20,12 +20,12 @@ The Varscan wrapper script runs the following:
 
 1. samtools flagstat on each bam file
 2. samtools mpileup on both bam files
-3. determine unique mapped read ratio
-4. VarScan copynumber
+3. Determine unique mapped read ratio
+4. Varscan copynumber
 5. Remove low coverage regions
-6. VarScan copyCaller
-7. calculate median for recentering
-8. VarScan copyCaller recenter
+6. Varscan copyCaller
+7. Calculate median for recentering
+8. Varscan copyCaller recenter
 9. Separate chromosome arms
 10. DNAcopy (CBS)
 11. Merge chromosome arms
@@ -50,16 +50,16 @@ For details on running docker containers in general, see the excellent tutorial 
 
 To see a usage statement, run
 
-``
+```
 docker run jeltje/varscan -h
-``
+```
 
 ### Example input:
 
-``
+```
 docker run  -v /path/to/input/files:/data jeltje/varscan -c normal.bam -t  tumor.bam -q sampleid -i genome.fa -b centromeres.bed -w targets.bed -s tmpdir > varscan.cnv
 
-``
+```
 
 where
 
@@ -69,7 +69,7 @@ where
 
 `genome.fa` is a fasta file containing the genome that was used to create the BAM files. A samtools indexed `.fai` file must be present in the same directory as this file (for details see Other Considerations, below)
 
-`centromeres.bed` is a bed format file containing centromere locations. This list is used to remove centromeres from the CBS calls.
+`centromeres.bed` is a [bed format file](https://genome.ucsc.edu/FAQ/FAQformat#format1) containing centromere locations. This list is used to remove centromeres from the CBS calls.
 
 `targets.bed` is a list of exome targets in bed format. This is used as a 'whitelist' of genome regions so that off target alignments will not be used for analysis
 
@@ -119,4 +119,4 @@ The whitelist is a bed format file with the exome targets used in the experiment
 
 Koboldt DC, Zhang Q, Larson DE, Shen D, McLellan MD, Lin L, Miller CA, Mardis ER, Ding L, Wilson RK. 
 VarScan 2: somatic mutation and copy number alteration discovery in cancer by exome sequencing. 
-Genome Res. 2012 Mar;22(3):568-76. doi: 10.1101/gr.129684.111. 
+Genome Res. 2012 Mar;22(3):568-76. doi: 10.1101/gr.129684.111.
