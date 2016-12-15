@@ -41,7 +41,7 @@ Alternatively, you can build from the github repo:
 ```
 git clone https://github.com/jeltje/varscan2.git
 cd varscan2
-docker build -t jeltje/varscan .
+docker build -t jeltje/varscan2 .
 ```
 
 ## Running the docker container
@@ -51,13 +51,13 @@ For details on running docker containers in general, see the excellent tutorial 
 To see a usage statement, run
 
 ```
-docker run jeltje/varscan -h
+docker run jeltje/varscan2 -h
 ```
 
 ### Example input:
 
 ```
-docker run  -v /path/to/input/files:/data jeltje/varscan -c normal.bam -t  tumor.bam -q sampleid -i genome.fa -b centromeres.bed -w targets.bed -s tmpdir > varscan.cnv
+docker run  -v /path/to/input/files:/data jeltje/varscan2 -c normal.bam -t  tumor.bam -q sampleid -i genome.fa -b centromeres.bed -w targets.bed -s tmpdir > varscan.cnv
 
 ```
 
