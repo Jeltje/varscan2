@@ -9,7 +9,7 @@ The Varscan2 executable (https://github.com/dkoboldt/varscan.git) combines sever
 
 This repository ONLY contains a pipeline for Varscan2 **copynumber variation**. If you want to run other Varscan tools, please use Varscan2 directly. This docker container contains a wrapper script that uses Varscan tools and other programs *with specific parameters*. These may not be the perfect parameters for your particular samples. See below for the full list of pipeline steps.
 
-**Inputs** to the program are a tumor/control pair of BAM files and several [bed format](https://genome.ucsc.edu/FAQ/FAQformat#format1) helper files (see below).
+**Inputs** to the program are a tumor/control pair of BAM files and several [bed format](https://genome.ucsc.edu/FAQ/FAQformat#format1) helper files (see below). Your input bam files must be sorted by coordinate (try `samtools sort`)
 **Output** is a file with chromosome segments that are scored for amplification or deletion.
 
 To get per-gene output, these scores must be mapped to an annotation, for example using [this program] (https://github.com/Jeltje/cnvtogenes)
@@ -35,7 +35,7 @@ The chromosome arms are separated before the Circular Binary Segmentation (CBS) 
 ## Getting the docker container
 
 The latest Varscan docker image can be downloaded directly from quay.io using
-`docker pull quay.io/jeltje/varscan`
+`docker pull quay.io/jeltje/varscan2`
 
 Alternatively, you can build from the github repo:
 ```

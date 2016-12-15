@@ -92,7 +92,7 @@ graceful_death() {
 file_check() {
     if [ $1 == 'False' ]; then
         print_usage
-        graceful_death "missing some input arguments"
+        graceful_death "some input arguments are missing"
     fi
     if [[ ! -e "$1" ]]; then
         print_usage
@@ -117,7 +117,7 @@ if  [[ -z "$prevDir" ]]; then
 	fi 
 	tmpExt=$RANDOM
 	tmpdir="$scratch/varscan.$tmpExt"
-	mkdir $tmpdir
+	mkdir -p $tmpdir
 else
 	if [ ! -d "$prevDir" ]; then
 		graceful_death "cannot find previous run directory $prevDir"
@@ -125,6 +125,36 @@ else
 	tmpdir=$prevDir
 fi
 >&2 echo "Output files will be stored in $tmpdir"
+
+# Make sure all inputs are for the same genome
+>&2 echo "Checking inputs..."
+
+# Check that the bam files are sorted
+issort(){
+  didsort=$(samtools view -H $1 | grep ^@HD | cut -f3)
+  if [[ "$didsort" != 'SO:coordinate' ]]; then
+    graceful_death "it looks like $1 is not sorted by coordinate, please run samtools sort"
+  fi
+}
+issort $tBam
+issort $cBam
+
+contain(){
+  if [[ $(comm -23 $1 $2) ]]; then
+    graceful_death "some or all of the chromosomes in the input $3 cannot be found in the genome fasta; please make sure all your inputs are for the same genome version"
+  fi
+}
+
+samtools view -H $tBam | grep ^@SQ | cut -f2 | cut -f2 -d':' | sort > $tmpdir/bam.chrs
+cut -f1 $cent | sort > $tmpdir/cent.chrs
+cut -f1 $white | sort -u > $tmpdir/target.chrs
+grep '>' $idx | sed 's/\s.*//' | sed 's/>//' | sort > $tmpdir/geno.chrs
+
+# all bam chrs, and all bed chromosomes should be in the genome (but not vice versa)
+contains $tmpdir/bam.chrs $tmpdir/geno.chrs $tBam
+contains $tmpdir/cent.chrs $tmpdir/geno.chrs $cent
+contains $tmpdir/target.chrs $tmpdir/geno.chrs $white
+
 
 # checks if a file exists and has more than one line in it
 # several programs in this wrapper will output a single line if they fail
