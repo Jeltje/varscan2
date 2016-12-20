@@ -151,10 +151,9 @@ cut -f1 $white | sort -u > $tmpdir/target.chrs
 grep '>' $idx | sed 's/\s.*//' | sed 's/>//' | sort > $tmpdir/geno.chrs
 
 # all bam chrs, and all bed chromosomes should be in the genome (but not vice versa)
-contains $tmpdir/bam.chrs $tmpdir/geno.chrs $tBam
-contains $tmpdir/cent.chrs $tmpdir/geno.chrs $cent
-contains $tmpdir/target.chrs $tmpdir/geno.chrs $white
-
+contain $tmpdir/bam.chrs $tmpdir/geno.chrs $tBam
+contain $tmpdir/cent.chrs $tmpdir/geno.chrs $cent
+contain $tmpdir/target.chrs $tmpdir/geno.chrs $white
 
 # checks if a file exists and has more than one line in it
 # several programs in this wrapper will output a single line if they fail
