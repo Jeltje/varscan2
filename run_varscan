@@ -131,7 +131,7 @@ fi
 
 # Check that the bam files are sorted
 issort(){
-  didsort=$(samtools view -H $1 | grep ^@HD | cut -f3)
+  didsort=$(samtools view -H $1 | grep -o 'SO:coordinate')
   if [[ "$didsort" != 'SO:coordinate' ]]; then
     graceful_death "it looks like $1 is not sorted by coordinate, please run samtools sort"
   fi
