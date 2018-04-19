@@ -83,5 +83,9 @@ outputs:
   - id: output
     type: stdout
 
-baseCommand: ["-s", "/var/spool/cwl"]
+baseCommand: []
+
+arguments:
+  - prefix: "-s"
+    valueFrom: $(runtime.outdir)
 
